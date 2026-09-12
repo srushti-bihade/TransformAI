@@ -1,1 +1,16 @@
 .venv/
+
+# Local database
+backend/transformai.db
+
+# Python virtual environments
+.venv/
+venv/
+backend/venv/
+
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
