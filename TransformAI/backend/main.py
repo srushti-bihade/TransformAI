@@ -5,6 +5,7 @@ from fastapi import (
     HTTPException,
     Depends
 )
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -50,12 +51,14 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174"
-    ],
+
+    # Allow localhost on any port
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+
     allow_credentials=True,
+
     allow_methods=["*"],
+
     allow_headers=["*"],
 )
 
@@ -76,6 +79,7 @@ def get_current_user(
     token = credentials.credentials
 
     try:
+
         payload = jwt.decode(
             token,
             SECRET_KEY,
@@ -86,6 +90,7 @@ def get_current_user(
         email = payload.get("email")
 
         if user_id is None or email is None:
+
             raise HTTPException(
                 status_code=401,
                 detail="Invalid authentication token."
@@ -97,6 +102,7 @@ def get_current_user(
         }
 
     except JWTError:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired authentication token."
@@ -108,11 +114,15 @@ def get_current_user(
 # ==================================================
 
 def get_db():
+
     db = SessionLocal()
 
     try:
+
         yield db
+
     finally:
+
         db.close()
 
 
@@ -197,10 +207,6 @@ async def upload_file(
             file_path
         )
 
-        # ------------------------------------------
-        # SHA-256 HASH
-        # ------------------------------------------
-
         sha256 = hashlib.sha256()
 
         with open(file_path, "rb") as f:
@@ -214,20 +220,12 @@ async def upload_file(
 
         file_hash = sha256.hexdigest()
 
-        # ------------------------------------------
-        # SAVE DOCUMENT
-        # ------------------------------------------
-
         document = Document(
             filename=filename,
             sha256_hash=file_hash
         )
 
         db.add(document)
-
-        # ------------------------------------------
-        # AUDIT LOG
-        # ------------------------------------------
 
         audit = AuditLog(
             user_email=current_user["email"],
@@ -278,10 +276,6 @@ async def video_to_text(
         filename
     )[1].lower()
 
-    # ----------------------------------------------
-    # CHECK FILE TYPE
-    # ----------------------------------------------
-
     if extension not in allowed_extensions:
 
         raise HTTPException(
@@ -291,10 +285,6 @@ async def video_to_text(
                 "Use MP4, MOV, AVI, MKV or WEBM."
             )
         )
-
-    # ----------------------------------------------
-    # SAVE VIDEO
-    # ----------------------------------------------
 
     file_path = os.path.join(
         UPLOAD_DIR,
@@ -310,10 +300,6 @@ async def video_to_text(
                 buffer
             )
 
-        # ------------------------------------------
-        # TRANSCRIBE VIDEO
-        # ------------------------------------------
-
         transcript = transcribe_video(
             file_path
         )
@@ -325,10 +311,6 @@ async def video_to_text(
                 detail="No speech could be detected in the video."
             )
 
-        # ------------------------------------------
-        # AUDIT LOG
-        # ------------------------------------------
-
         audit = AuditLog(
             user_email=current_user["email"],
             action="VIDEO_TRANSCRIBED",
@@ -338,10 +320,6 @@ async def video_to_text(
         db.add(audit)
 
         db.commit()
-
-        # ------------------------------------------
-        # RESPONSE
-        # ------------------------------------------
 
         return {
             "message": "Video converted to text successfully!",
@@ -379,10 +357,6 @@ async def video_url_to_text(
         ""
     ).strip()
 
-    # ----------------------------------------------
-    # CHECK URL
-    # ----------------------------------------------
-
     if not url:
 
         raise HTTPException(
@@ -391,10 +365,6 @@ async def video_url_to_text(
         )
 
     try:
-
-        # ------------------------------------------
-        # DOWNLOAD + TRANSCRIBE
-        # ------------------------------------------
 
         transcript = transcribe_video_url(
             url
@@ -407,10 +377,6 @@ async def video_url_to_text(
                 detail="No speech could be detected in this video."
             )
 
-        # ------------------------------------------
-        # AUDIT LOG
-        # ------------------------------------------
-
         audit = AuditLog(
             user_email=current_user["email"],
             action="VIDEO_URL_TRANSCRIBED",
@@ -420,10 +386,6 @@ async def video_url_to_text(
         db.add(audit)
 
         db.commit()
-
-        # ------------------------------------------
-        # RESPONSE
-        # ------------------------------------------
 
         return {
             "message": "Video URL converted to text successfully!",
@@ -500,10 +462,6 @@ async def transform(
             )
         )
 
-        # ------------------------------------------
-        # PARSE SUGGESTIONS
-        # ------------------------------------------
-
         suggestions = []
 
         if "SUGGESTIONS:" in result:
@@ -548,10 +506,6 @@ async def transform(
                 ""
             ).strip()
 
-        # ------------------------------------------
-        # AUDIT LOG
-        # ------------------------------------------
-
         audit = AuditLog(
             user_email=current_user["email"],
             action="AI_TRANSFORMATION",
@@ -594,8 +548,7 @@ async def history(
     logs = (
         db.query(AuditLog)
         .filter(
-            AuditLog.user_email
-            == current_user["email"]
+            AuditLog.user_email == current_user["email"]
         )
         .order_by(
             AuditLog.timestamp.desc()
